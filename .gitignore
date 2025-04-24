@@ -174,5 +174,5 @@ cython_debug/
 .pypirc
 
 # script specififc
-.joblib
-embeddings.joblib
+*.joblib
+vectormap copy.py
