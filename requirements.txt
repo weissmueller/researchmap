@@ -1,0 +1,12 @@
+# Core
+requests>=2.31
+tqdm>=4.66
+numpy>=1.26
+pandas>=2.2        # NEW ← plotly.express dependency
+joblib>=1.4
+scikit-learn>=1.4
+umap-learn>=0.5
+plotly>=5.22
+# PDFs
+pypdf>=4.2.0
+PyPDF2>=3.0.1
