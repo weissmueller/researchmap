@@ -10,3 +10,6 @@ plotly>=5.22
 # PDFs
 pypdf>=4.2.0
 PyPDF2>=3.0.1
+hdbscan
+scikit-learn
+matplotlib

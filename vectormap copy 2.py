@@ -38,25 +38,11 @@ except ImportError:
 import plotly.express as px
 import plotly.io as pio
 
-import matplotlib.pyplot as plt   # only used if SHOW_KDIST_PLOT
-
-from sklearn.neighbors import NearestNeighbors
-from kneed import KneeLocator
-
-# clustering libraries
-import hdbscan                     # ← NEW
-from sklearn.preprocessing import normalize
-
-
 # ── constants ───────────────────────────────────────────────────────────────
 BATCH = 16
 TIMEOUT = 120
 HEADERS = {"Content-Type": "application/json"}
 GROBID_URL = os.getenv("GROBID_URL", "http://localhost:8070/api/processHeaderDocument")
-
-MIN_CLUSTER_SIZE = 15      # put these near the constants section
-MIN_SAMPLES      = None    # None lets HDBSCAN pick a good default
-
 
 ##############################################################################
 # 1) FILE INGESTION                                                          #
@@ -192,39 +178,24 @@ def name_cluster(digest, host, model):
 
 def label_cache(
     cache: pathlib.Path,
-    min_cluster_size: int,                 # ← only one size param now
+    eps: float,
+    min_samples: int,
     *,
     meta_source: str,
     llm_host: str,
     llm_model: str,
-    metric: str = "euclidean",             # ‘euclidean’ after normalising for cosine
-    min_samples: int | None = None,        # optional HDBSCAN density knob
+    metric: str,
 ):
-    """
-    Run HDBSCAN once, store integer labels and pretty names back into <cache>.
-    """
     data = joblib.load(cache)
     X, paths = data["embeddings"], data["files"]
 
-    # --- distance handling -------------------------------------------------
-    if metric == "cosine":
-        X_clust = normalize(X)             # L2 normalise so Euclidean ≈ cosine
-        metric_used = "euclidean"
-    else:
-        X_clust = X
-        metric_used = metric
-
-    clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=min_cluster_size,
+    # cluster with the chosen distance metric
+    labels = DBSCAN(
+        eps=eps,
         min_samples=min_samples,
-        metric=metric_used,
-        cluster_selection_method="eom",    # default: robust flat clustering
-        prediction_data=False,
-    ).fit(X_clust)
+        metric=metric               # <-- use it here
+    ).fit_predict(X)
 
-    labels = clusterer.labels_            # -1 denotes noise
-
-    # --- LLM cluster-naming -----------------------------------------------
     names: dict[int, str] = {}
     if llm_host:
         for cid in set(labels):
@@ -238,12 +209,10 @@ def label_cache(
                 logging.warning("LLM naming failed for cluster %s – %s", cid, e)
                 names[cid] = f"Cluster {cid}"
 
-    # --- cache update ------------------------------------------------------
     data["labels"] = labels
     data["cluster_names"] = names
     joblib.dump(data, cache)
-    print("✅ HDBSCAN labels & names stored →", cache)
-
+    print("✅ labels & names stored →", cache)
 
 
 ##############################################################################
@@ -337,8 +306,6 @@ def main():
     p_lab.add_argument("--meta-source", choices=["simple", "grobid"], default="simple")
     p_lab.add_argument("--llm-host", required=True)
     p_lab.add_argument("--llm-model", default="gemma3:4b")
-
-
     p_lab.add_argument(
     "--metric",
     choices=["euclidean", "cosine"],
@@ -361,22 +328,12 @@ def main():
         embed_folder(args.folder, args.host, args.model, args.out)
 
     elif args.cmd == "label":
-        if args.auto:
-            eps, min_samples = suggest_dbscan_params(
-                joblib.load(args.cache)["embeddings"], args.metric)
-            print(f"auto-selected: eps={eps:.3f}, min_samples={min_samples}")
-        else:
-            eps, min_samples = args.eps, args.min_samples
-
         label_cache(
-            args.cache,
-            min_cluster_size=args.min_cluster_size,
+            args.cache, args.eps, args.min_samples,
             meta_source=args.meta_source,
-            llm_host=args.llm_host,
-            llm_model=args.llm_model,
+            llm_host=args.llm_host, llm_model=args.llm_model,
             metric=args.metric,
         )
-
 
     else:  # map
         map_embeddings(
