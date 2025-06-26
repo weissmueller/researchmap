@@ -10,8 +10,9 @@
 - **Custom Embedding:** Choose to embed using the full text, only keywords, or other fields.
 - **State-of-the-Art Clustering:** Supports community detection (Leiden/Louvain) on k-NN graphs for robust, modern clustering.
 - **Automatic Cluster Naming:** Uses an LLM to generate short, descriptive names for each cluster.
+- **Refinement Step:** Optionally re-assigns each paper to the best-fitting cluster using the LLM, based on the paper's metadata and the generated cluster names.
 - **Interactive Visualization:** Explore your clusters in an interactive 2D map.
-- **Export Results:** Optionally export an XLSX file with cluster assignments for each paper (works for both HDBSCAN and community workflows).
+- **Export Results:** Optionally export an XLSX file with cluster assignments for each paper (works for both HDBSCAN, community, and refined workflows).
 
 ---
 
@@ -49,7 +50,20 @@ python vectormap_table.py community '/path/to/yourfile.joblib' --algorithm leide
 
 ---
 
-### 3. **(Optional) Cluster using HDBSCAN and export results**
+### 3. **(Optional) Refine cluster assignments with the LLM**
+
+For each paper, the LLM is asked which of the generated cluster names fits best, using the paper's title, abstract, and keywords. The process is shown with a progress bar and detailed console output.
+
+```bash
+python vectormap_table.py refine '/path/to/yourfile.joblib' --llm-host http://localhost:11434 --export-xlsx
+```
+
+- Refined assignments are stored as `refined_labels` and `refined_cluster_names` in the joblib file.
+- To export the refined assignments to XLSX, use `--export-xlsx` (creates `yourfile_refined_clusters.xlsx`).
+
+---
+
+### 4. **(Optional) Cluster using HDBSCAN and export results**
 
 You can also use the `label` command to cluster with HDBSCAN and export the results to an XLSX file:
 
@@ -61,7 +75,7 @@ python vectormap_table.py label '/path/to/yourfile.joblib' --llm-host http://loc
 
 ---
 
-### 4. **Visualize the clusters**
+### 5. **Visualize the clusters**
 
 Opens an interactive map in your browser:
 
@@ -70,6 +84,7 @@ python vectormap_table.py map '/path/to/yourfile.joblib'
 ```
 
 - Hover over points to see the paper title and cluster name.
+- (Currently visualizes the original or community clusters; to visualize refined clusters, further customization may be needed.)
 
 ---
 
@@ -91,6 +106,16 @@ python vectormap_table.py map '/path/to/yourfile.joblib'
 - `--export-xlsx`  
   Export an XLSX file with the original paper metadata and the cluster name for each paper (community workflow).
 
+### Refinement
+
+- `--llm-host`  
+  Ollama host for LLM requests (default: http://localhost:11434).
+- `--llm-model`  
+  LLM model to use (default: gemma3:4b).
+- `--export-xlsx`  
+  Export an XLSX file with the refined cluster name for each paper (creates `*_refined_clusters.xlsx`).
+- Shows a progress bar and prints the assignment for each paper.
+
 ### HDBSCAN Labeling
 
 - `--export-xlsx`  
@@ -107,6 +132,7 @@ python vectormap_table.py map '/path/to/yourfile.joblib'
 ```bash
 python vectormap_table.py embed '/path/to/yourfile.xlsx' --keywords-only
 python vectormap_table.py community '/path/to/yourfile.joblib' --algorithm leiden --k 5 --export-xlsx
+python vectormap_table.py refine '/path/to/yourfile.joblib' --llm-host http://localhost:11434 --export-xlsx
 python vectormap_table.py label '/path/to/yourfile.joblib' --llm-host http://localhost:11434 --export-xlsx
 python vectormap_table.py map '/path/to/yourfile.joblib'
 ```
@@ -127,7 +153,8 @@ python vectormap_table.py map '/path/to/yourfile.joblib'
 
 - Your input file must have at least the columns "Paper Title" and "Abstract". For keyword-based embedding, a "Keywords" column is recommended.
 - The script will automatically skip header rows if needed.
-- The LLM for cluster naming is expected to be available at `http://localhost:11434` (Ollama or compatible).
-- The `--export-xlsx` option is available for both the `label` (HDBSCAN) and `community` workflows.
+- The LLM for cluster naming and refinement is expected to be available at `http://localhost:11434` (Ollama or compatible).
+- The `--export-xlsx` option is available for the `label` (HDBSCAN), `community`, and `refine` workflows.
+- The refine step stores assignments as `refined_labels` and `refined_cluster_names` in the joblib file.
 
 --- 
